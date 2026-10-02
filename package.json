@@ -5,11 +5,10 @@
 	"type": "module",
 	"description": "pix-sudo (`sudo_run` tool) ported from @xynogen/pix-sudo@0.3.31 to omp 18.4.10, with pix-runtime and pix-pretty vendored in-tree.",
 	"license": "MIT",
-	"author": "xynogen (upstream); omp port",
+	"author": "steimerbyte (omp port); original work Copyright (c) 2026 xynogen",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/xynogen/pix-mono.git",
-		"directory": "packages/pix-sudo"
+		"url": "git+https://github.com/steimerbyte/omp-pix-sudo.git"
 	},
 	"omp": {
 		"extensions": [

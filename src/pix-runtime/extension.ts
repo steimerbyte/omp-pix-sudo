@@ -56,8 +56,10 @@ export default function registerRuntime(pi: ExtensionAPI): void {
 		//     (override with `{ result }`)"; "Let TypeScript enforce the exact
 		//     return shape rather than returning fields intended for a different
 		//     event."
-		//   <local analysis document> §2, §3 — full contract
-		//     analysis against the 18.1.3 sources and the 18.4.10 binary.
+		//   Verified against omp 18.4.10: `UserBashEventResult` carries only
+		//     `result?: BashResult`, so the contract was checked by reading the
+		//     host package's extension sources and the shipped binary rather than
+		//     from any external document.
 
 		let initialized = false;
 		pi.on("session_start", async () => {

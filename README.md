@@ -21,6 +21,15 @@ vendored verbatim under `git-src/` so the port can be diffed against upstream.
 the current latest at vendoring time. `pix-runtime` was pinned explicitly to
 0.12.2 (pix-sudo asks for `^0.12.0`).
 
+**These are a deliberately pinned snapshot, not the current upstream.** As of
+2026-10-02 the upstream monorepo has moved on: `xynogen/pix-mono` on `main`
+declares pix-sudo **0.3.32** and pix-pretty **1.30.0**. Neither is on npm yet —
+`npm view @xynogen/pix-sudo dist-tags` still reports `latest: 0.3.31`, and
+`@xynogen/pix-pretty` still tops out at 1.29.0. The port therefore tracks the
+last **published** upstream, which is exactly what the sha256 column above
+pins. Moving to 0.3.32/1.30.0 is a separate port with its own compatibility
+review; this repository is the 0.3.31 line.
+
 Upstream declaration:
 
 - pix-sudo `dependencies`: `@xynogen/pix-pretty@^1.19.0`, `@xynogen/pix-runtime@^0.12.0`
@@ -39,11 +48,12 @@ MIT License
 Copyright (c) 2026 xynogen
 ```
 
-`package.json#license` is `"MIT"` in all three, and each ships a full `LICENSE`
-file. MIT permits forking, modifying and redistributing provided the copyright
-and licence notice travel with the copies — which they do here (`LICENSE` at
-repo root, plus per-package copies under `git-src/`). Nothing in the tree is
-proprietary or restricted.
+`package.json#license` is `"MIT"` in all three, and the two packages that ship
+their own copy also carry it verbatim in-tree: `git-src/pix-pretty/LICENSE`
+and `git-src/pix-runtime/LICENSE`, byte-identical to the root `LICENSE`.
+MIT permits forking, modifying and redistributing provided the copyright
+and licence notice travel with the copies — which they do. Nothing in the
+tree is proprietary or restricted.
 
 ## The bug being fixed
 
@@ -234,20 +244,24 @@ a real terminal.
 
 ## Installation
 
-Local, from a checkout:
+From Git:
 
 ```bash
+omp install github:steimerbyte/omp-pix-sudo#v0.3.31-omp.1
+```
+
+Use an immutable tag or commit for reproducible installs — the release tag
+above is the ref this line points at. `main` will move.
+
+Local, from a checkout — clone, then link the working copy so edits take effect
+without reinstalling:
+
+```bash
+git clone https://github.com/steimerbyte/omp-pix-sudo.git
 omp plugin link <path-to-checkout>
 ```
 
-From Git — tag first, then install. Use an immutable ref:
-*"Use an immutable tag or commit for reproducible installs."*
-
-```bash
-git tag -a v0.3.31-omp.1 -m "pix-sudo port for omp 18.4.10"
-git push origin v0.3.31-omp.1
-omp install github:steimerbyte/omp-pix-sudo#v0.3.31-omp.1
-```
+`omp plugin link` takes a path, so point it wherever the clone ended up.
 
 Extension factories are initialised at session startup. After changing
 `src/index.ts`, exit and start a new session to load the new code — there is no
