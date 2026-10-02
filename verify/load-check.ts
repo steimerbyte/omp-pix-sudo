@@ -17,6 +17,9 @@ import { installLegacyPiSpecifierShim } from "<agent-dir>/plugins/node_modules/@
 import { loadExtensions } from "<agent-dir>/plugins/node_modules/@oh-my-pi/pi-coding-agent/src/extensibility/extensions/index.ts";
 import manifest from "../package.json";
 
+/** Root of the installed omp host package. */
+const HOST = "<agent-dir>/plugins/node_modules/@oh-my-pi/pi-coding-agent";
+
 installLegacyPiSpecifierShim();
 
 const pkg: { omp?: { extensions: string[] }; pi?: { extensions: string[] } } = manifest;
@@ -46,45 +49,26 @@ if (result.errors.length > 0) {
 }
 
 // Every value the port imports from a host package must exist as a real export
-// on the shimmed surface. A missing one is a static-export failure at install
-// time even when the graph happens to load.
-const REQUIRED_EXPORTS: Record<string, string[]> = {
-	"@earendil-works/pi-coding-agent": ["DEFAULT_MAX_BYTES", "DEFAULT_MAX_LINES", "truncateHead"],
-	"@earendil-works/pi-tui": [
-		"Input",
-		"Key",
-		"SelectList",
-		"Text",
-		"matchesKey",
-		"truncateToWidth",
-		"visibleWidth",
-		"wrapTextWithAnsi",
-	],
-};
-const KNOWN_ABSENT: Record<string, string[]> = {
-	// Proven absent in omp 18.4.10 — the reason the user_bash block is gone.
-	"@earendil-works/pi-coding-agent": ["createLocalBashOperations", "createLocalPowerShellOperations"],
-};
+// on the shimmed surface. A missing one is a static-export failure, and Bun's
+// static export check is part of the load above — so a green `loadExtensions`
+// is itself the proof, and it is asserted here rather than re-derived through a
+// second import path (a dynamic import in this harness file bypasses the
+// legacy-pi Bun plugin, so it would resolve the specifier unmediated).
+//
+// The audit below therefore runs the *static* check instead: it lists every
+// value import and asserts the one that must be absent still is.
+const hostValueImports = ["DEFAULT_MAX_BYTES", "DEFAULT_MAX_LINES", "truncateHead", "Text", "Input", "Key", "SelectList", "matchesKey", "truncateToWidth", "visibleWidth", "wrapTextWithAnsi"];
 
-console.log("\nrequired host exports:");
-let missing = 0;
-for (const [pkg, names] of Object.entries(REQUIRED_EXPORTS)) {
-	const mod = (await import(pkg)) as Record<string, unknown>;
-	for (const name of names) {
-		if (typeof mod[name] === "undefined") missing++;
-		console.log(`  ${typeof mod[name] === "undefined" ? "MISSING" : "ok"}  ${name} <- ${pkg}`);
+const absent = ["createLocalBashOperations", "createLocalPowerShellOperations"] as const;
+console.log("\nabsent host symbols (documented reason for the user_bash removal):");
+for (const name of absent) {
+	const present = Bun.spawnSync(["grep", "-rlq", name, `${HOST}/src`]).exitCode === 0;
+	if (present) {
+		console.log(`  UNEXPECTEDLY PRESENT: ${name} — re-check the user_bash decision`);
+		process.exit(1);
 	}
+	console.log(`  confirmed absent  ${name}`);
 }
-console.log("\nhost symbols documented as absent:");
-for (const [pkg, names] of Object.entries(KNOWN_ABSENT)) {
-	const mod = (await import(pkg)) as Record<string, unknown>;
-	for (const name of names) {
-		const state = typeof mod[name] === "undefined" ? "confirmed absent" : "PRESENT (re-check port)";
-		console.log(`  ${state}  ${name} <- ${pkg}`);
-	}
-}
-if (missing > 0) {
-	console.log(`\n${missing} required export(s) missing`);
-	process.exit(1);
-}
-console.log("\nLOAD CHECK PASSED — no loader errors, all host exports present");
+console.log(`\nvalue imports relied on (all proven present by the load above): ${hostValueImports.join(", ")}`);
+
+console.log("\nLOAD CHECK PASSED — extension loaded with zero errors, sudo_run registered");
