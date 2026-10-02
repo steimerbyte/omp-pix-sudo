@@ -1,16 +1,35 @@
 {
-  "name": "omp-pix-sudo",
-  "version": "0.0.0",
-  "private": true,
-  "description": "Port of @xynogen/pix-sudo to omp. NOT yet ported — sources vendored for reference only.",
-  "type": "module",
-  "license": "MIT",
-  "upstream": {
-    "pix-sudo": "npm:@xynogen/pix-sudo@0.3.31",
-    "pix-runtime": "npm:@xynogen/pix-runtime@0.12.2",
-    "pix-pretty": "npm:@xynogen/pix-pretty@1.29.0"
-  },
-  "scripts": {
-    "verify": "echo 'no build yet — port in progress'"
-  }
+	"name": "omp-pix-sudo",
+	"version": "0.3.31-omp.1",
+	"private": true,
+	"type": "module",
+	"description": "pix-sudo (`sudo_run` tool) ported from @xynogen/pix-sudo@0.3.31 to omp 18.4.10, with pix-runtime and pix-pretty vendored in-tree.",
+	"license": "MIT",
+	"author": "xynogen (upstream); omp port",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/xynogen/pix-mono.git",
+		"directory": "packages/pix-sudo"
+	},
+	"omp": {
+		"extensions": ["./src/index.ts"]
+	},
+	"files": ["src", "verify", "LICENSE", "README.md"],
+	"dependencies": {},
+	"optionalDependencies": {
+		"cli-highlight": "^2.1.11",
+		"chalk": "^4.1.2"
+	},
+	"peerDependencies": {
+		"@earendil-works/pi-tui": "*",
+		"@earendil-works/pi-coding-agent": "*"
+	},
+	"devDependencies": {
+		"@oh-my-pi/pi-coding-agent": "^18.4.10"
+	},
+	"upstream": {
+		"pix-sudo": "npm:@xynogen/pix-sudo@0.3.31",
+		"pix-runtime": "npm:@xynogen/pix-runtime@0.12.2",
+		"pix-pretty": "npm:@xynogen/pix-pretty@1.29.0"
+	}
 }
