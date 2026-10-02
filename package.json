@@ -1,0 +1,16 @@
+{
+  "name": "omp-pix-sudo",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Port of @xynogen/pix-sudo to omp. NOT yet ported — sources vendored for reference only.",
+  "type": "module",
+  "license": "MIT",
+  "upstream": {
+    "pix-sudo": "npm:@xynogen/pix-sudo@0.3.31",
+    "pix-runtime": "npm:@xynogen/pix-runtime@0.12.2",
+    "pix-pretty": "npm:@xynogen/pix-pretty@1.29.0"
+  },
+  "scripts": {
+    "verify": "echo 'no build yet — port in progress'"
+  }
+}
