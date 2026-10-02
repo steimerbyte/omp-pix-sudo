@@ -12,9 +12,15 @@
 		"directory": "packages/pix-sudo"
 	},
 	"omp": {
-		"extensions": ["./src/index.ts"]
+		"extensions": [
+			"./src/index.ts"
+		]
 	},
-	"files": ["src", "verify", "LICENSE", "README.md"],
+	"files": [
+		"src",
+		"LICENSE",
+		"README.md"
+	],
 	"dependencies": {},
 	"optionalDependencies": {
 		"cli-highlight": "^2.1.11",
