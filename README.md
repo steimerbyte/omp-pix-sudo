@@ -21,14 +21,7 @@ vendored verbatim under `git-src/` so the port can be diffed against upstream.
 the current latest at vendoring time. `pix-runtime` was pinned explicitly to
 0.12.2 (pix-sudo asks for `^0.12.0`).
 
-**These are a deliberately pinned snapshot, not the current upstream.** As of
-2026-10-02 the upstream monorepo has moved on: `xynogen/pix-mono` on `main`
-declares pix-sudo **0.3.32** and pix-pretty **1.30.0**. Neither is on npm yet —
-`npm view @xynogen/pix-sudo dist-tags` still reports `latest: 0.3.31`, and
-`@xynogen/pix-pretty` still tops out at 1.29.0. The port therefore tracks the
-last **published** upstream, which is exactly what the sha256 column above
-pins. Moving to 0.3.32/1.30.0 is a separate port with its own compatibility
-review; this repository is the 0.3.31 line.
+Upstream is ahead in git but not on npm: `xynogen/pix-mono` on `main` is at pix-sudo 0.3.32 / pix-pretty 1.30.0 and 0.3.32 is not published yet, so this port deliberately tracks the npm line (0.3.31 / 1.29.0) that the sha256 column above pins — moving to 0.3.32 is a separate port.
 
 Upstream declaration:
 
@@ -258,10 +251,12 @@ without reinstalling:
 
 ```bash
 git clone https://github.com/steimerbyte/omp-pix-sudo.git
-omp plugin link <path-to-checkout>
+cd omp-pix-sudo
+omp plugin link "$PWD"
 ```
 
-`omp plugin link` takes a path, so point it wherever the clone ended up.
+`omp plugin link` takes a path to a directory; `"$PWD"` is whatever the clone
+ended up as, so the three lines above run as-is wherever you start them.
 
 Extension factories are initialised at session startup. After changing
 `src/index.ts`, exit and start a new session to load the new code — there is no
