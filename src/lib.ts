@@ -108,6 +108,25 @@ function spawnSudo(args: string[], password: string, signal?: AbortSignal): Prom
 		let stdout = "";
 		let stderr = "";
 
+		// `once` only fires the listener when the abort actually happens. On the
+		// normal path the listener would otherwise stay attached to the caller's
+		// signal holding this closure — and the child-process handle — for the
+		// rest of the session. Detach it as soon as the promise settles.
+		const onAbort = (): void => {
+			proc.kill("SIGTERM");
+			reject(new Error("Cancelled"));
+		};
+		if (signal?.aborted) {
+			onAbort();
+			return;
+		}
+		signal?.addEventListener("abort", onAbort, { once: true });
+		const settle = <T>(fn: (value: T) => void) =>
+			(value: T): void => {
+				signal?.removeEventListener("abort", onAbort);
+				fn(value);
+			};
+
 		proc.stdout.on("data", (chunk: Buffer) => {
 			stdout += chunk.toString();
 		});
@@ -117,23 +136,10 @@ function spawnSudo(args: string[], password: string, signal?: AbortSignal): Prom
 			if (filtered) stderr += filtered;
 		});
 
-		proc.on("error", reject);
-		proc.on("close", (code) => {
-			resolve({ stdout, stderr, code: code ?? 1 });
-		});
+		proc.on("error", settle(reject));
+		proc.on("close", settle((code: number | null) => resolve({ stdout, stderr, code: code ?? 1 })));
 
 		proc.stdin.write(`${password}\n`);
 		proc.stdin.end();
-
-		if (signal) {
-			signal.addEventListener(
-				"abort",
-				() => {
-					proc.kill("SIGTERM");
-					reject(new Error("Cancelled"));
-				},
-				{ once: true },
-			);
-		}
 	});
 }

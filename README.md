@@ -4,7 +4,7 @@ Port of the upstream `pix-sudo` stack to omp. **The port is complete** — `src/
 contains the working extension, and `omp plugin link` loads it with `sudo_run`
 registered.
 
-Port version: **0.3.31-omp.1**
+Port version: **0.3.31-omp.2**
 
 ## Origin
 
@@ -229,22 +229,85 @@ Verified 2026-10-02 against omp 18.4.10:
 - Print mode → the tool returns `isError: true` with `errorKind: "no-ui"`,
   confirming the non-interactive guard.
 
-**Not tested — open gap:** the TUI overlay path (the `SelectList` approval
-list, the masked password prompt, PAM-ticket reuse and the dead-man's-switch
-countdown) has **not** been exercised. Every run so far was headless. The
-overlay is the feature this port exists for, and it remains unverified against
-a real terminal.
+Verified 2026-10-03 against omp 18.4.11 — see **0.3.31-omp.2** below.
+
+**Still not tested — open gap:** the TUI overlay path (the `SelectList`
+approval list, the masked password prompt, PAM-ticket reuse and the
+dead-man's-switch countdown) has **not** been exercised against a real
+terminal. The renderer and result-shaping paths were, but drawing the overlay
+itself and typing a password into it were not.
+
+## 0.3.31-omp.2 — runtime fixes
+
+`0.3.31-omp.1` shipped a port that loaded and registered cleanly, so the bugs
+below were invisible to every check that version was verified with. They were
+found by driving the real renderers through a replica of omp's own render-call
+convention, and by auditing the tool against the 18.4.11 host source.
+
+### 1. Cards never collapsed — `src/index.ts`
+
+The port keyed its per-card render state on `options.toolCallId`, and its own
+comment already recorded that the host forwards no call id. It did not:
+
+- `ToolRenderResultOptions` (`types.ts:637`) carries only `expanded`,
+  `isPartial`, `spinnerFrame`.
+- `RegisteredToolAdapter` rebuilds a **fresh three-key literal** for every
+  `renderResult` (`wrapper.ts:96`).
+- Its `renderCall` proxy forwards any property that is not an own key of that
+  literal to the **live `Theme`**, which has no `toolCallId` (`wrapper.ts:43-55`).
+
+So `toolCallId` was always `undefined`, every render minted a *fresh* state
+bag, and with it: `state.collapsed` never latched, the call row was never
+hidden, and `tickCollapse` re-armed a 10s timer on **every repaint** of every
+settled card. The collapse feature — the point of the vendored `collapse`
+section — was dead, and leaked one `Map` entry plus one live interval per
+repaint for the life of the process.
+
+The card's per-call `args` object *is* stable: `ToolExecutionComponent` holds
+one `#args`, and `#getCallArgsForRender()` returns that same reference for
+non-edit tools (`tool-execution.ts:1652-1656`). The state bag is now a
+`WeakMap` keyed on it, so each card keeps one bag across repaints and the
+entry is collected with the card.
+
+### 2. Denied and cancelled root requests were reported as success
+
+The denial, timeout and cancel branches returned a result with no `isError`
+key, which the host reads as falsy (`wrapper.ts:479` —
+`result.isError ?? !!executionError`). Pressing **Deny** told the model the
+call succeeded, so it would report the task done. Both branches now set
+`isError: true`; a blocked request must read as a failure.
+
+### 3. Abort listener leaked per call — `src/lib.ts`
+
+`spawnSudo` registered an `{ once: true }` abort listener that was never
+removed on the normal path, so every `sudo_run` left a listener on the caller's
+signal holding that child's handle for the rest of the session. The listener is
+now detached when the promise settles, and an already-aborted signal short
+circuits before the call proceeds.
 
 ## Installation
 
 From Git:
 
 ```bash
-omp install github:steimerbyte/omp-pix-sudo#v0.3.31-omp.1
+omp install github:steimerbyte/omp-pix-sudo#v0.3.31-omp.2
 ```
 
 Use an immutable tag or commit for reproducible installs — the release tag
 above is the ref this line points at. `main` will move.
+
+**`omp install` needs `bun` on `PATH`.** omp installs plugins by running
+`bun install` in the plugins directory (`installer.ts:48`), so without bun it
+fails with:
+
+```
+Failed to install <spec>: Error: Executable not found in $PATH: "bun"
+```
+
+This is omp asking for its own tooling, not a fault in this plugin — the
+extension never invokes bun at runtime, and `omp plugin link` loads it
+without bun present. Install bun (any recent version) and the install path
+works.
 
 Local, from a checkout — clone, then link the working copy so edits take effect
 without reinstalling:

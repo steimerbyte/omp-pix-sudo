@@ -153,12 +153,11 @@ function isTerminal(details: SudoResultDetails): boolean {
 /**
  * The host's render options for a sudo_run card.
  *
- * `ToolRenderResultOptions` (types.ts:584) only carries `expanded`, `isPartial`
+ * `ToolRenderResultOptions` (types.ts:637) carries only `expanded`, `isPartial`
  * and `spinnerFrame`; it has no per-card state slot and no `invalidate`, and the
- * host does not forward a tool-call id either. The upstream port read all three
- * off the render context, which under omp means `state` is `undefined` and the
- * collapse path would throw on every render. Cards are therefore keyed by the
- * `toolCallId` the tool itself observed in `execute`, which is unique per call.
+ * host forwards no tool-call id. The upstream port read all three off the render
+ * context, which under omp means `state` is `undefined` and the collapse path
+ * would throw on every render.
  */
 export interface RenderOptionsLike {
 	expanded?: boolean;
@@ -166,15 +165,43 @@ export interface RenderOptionsLike {
 	spinnerFrame?: number;
 }
 
-const COLLAPSE_STATES = new Map<string, CollapseState>();
-let untitledCardSeq = 0;
+/**
+ * Per-card collapse bags, keyed on the host's per-card `args` object.
+ *
+ * Keying must use an identity that survives repaints, because the card is
+ * re-rendered on every host tick (spinner frames, resize, sibling updates) and
+ * a key that changes per render silently resets the bag: `state.collapsed`
+ * never latches and `tickCollapse` re-arms its timer on every pass.
+ *
+ * The host does forward no tool-call id — `RegisteredToolAdapter` rebuilds the
+ * render options as a fresh three-key literal per render
+ * (`wrapper.ts:96`), and its `renderCall` proxy forwards unknown properties to
+ * the live `Theme` (`wrapper.ts:43-55`), so `options.toolCallId` is always
+ * `undefined`. Reading it cannot key anything.
+ *
+ * The per-card `args` object *is* stable: `ToolExecutionComponent` holds one
+ * `#args` and `#getCallArgsForRender()` returns that same reference for
+ * non-edit tools (`tool-execution.ts:1652-1656`), and both `renderCall` and
+ * `renderResult` receive it. A `WeakMap` keyed on it therefore gives each card
+ * one stable bag across all of its repaints, and the entry is collected with the
+ * card — no leak, and no `onSession` bookkeeping to get wrong.
+ */
+const COLLAPSE_STATES = new WeakMap<object, CollapseState>();
 
-function collapseStateFor(toolCallId: string | undefined): CollapseState {
-	const key = toolCallId ?? `sudo:untitled:${++untitledCardSeq}`;
-	let state = COLLAPSE_STATES.get(key);
+/**
+ * Fallback bag for the host passing a non-object `args`, which a registered
+ * tool never does. Shared rather than per-render so at most one collapse timer
+ * is armed even on this defensive path; a fresh bag per render would re-arm the
+ * timer on every repaint, and a per-card bag is impossible without an identity.
+ */
+const UNKEYED_COLLAPSE_STATE: CollapseState = {};
+
+function collapseStateFor(card: unknown): CollapseState {
+	if (card === null || typeof card !== "object") return UNKEYED_COLLAPSE_STATE;
+	let state = COLLAPSE_STATES.get(card);
 	if (!state) {
 		state = {};
-		COLLAPSE_STATES.set(key, state);
+		COLLAPSE_STATES.set(card, state);
 	}
 	return state;
 }
@@ -260,9 +287,9 @@ export default function (pi: ExtensionAPI): void {
 
 		async execute(toolCallId, params, signal, onUpdate, ctx) {
 			const { command, reason } = params;
-			// The host does not forward a tool-call id to renderCall/renderResult,
-			// so the card's render state is keyed from the id observed here.
-			collapseStateFor(toolCallId);
+			// `toolCallId` is deliberately unused. The host forwards no call id to
+			// the renderers, so the card's collapse bag is keyed on the per-card
+			// `args` object the renderers do receive — see `collapseStateFor`.
 
 			const mode = getUnattendedMode(pi.events);
 			const yolo = mode === "yolo";
@@ -273,6 +300,8 @@ export default function (pi: ExtensionAPI): void {
 						outcome: "denied",
 						cancellationKind: "denied",
 					}),
+					// Blocked, not completed — see the cancellation branch below.
+					isError: true,
 				};
 			}
 
@@ -419,6 +448,12 @@ export default function (pi: ExtensionAPI): void {
 				return {
 					content: [{ type: "text", text: `Cancelled — ${msg}` }],
 					details: makeDetails(command, reason, { outcome, cancellationKind }),
+					// The command did NOT run. The host reads an omitted `isError`
+					// as falsy (`wrapper.ts:479` — `result.isError ?? !!executionError`),
+					// so without this the model is handed a clean success for a
+					// denied, timed-out or cancelled root request and will report
+					// the task as done. A blocked request must read as a failure.
+					isError: true,
 				};
 			}
 
@@ -544,7 +579,7 @@ export default function (pi: ExtensionAPI): void {
 			theme: ThemeLike,
 		) => {
 			resolveBaseBackground(theme);
-			const state = collapseStateFor(options.toolCallId);
+			const state = collapseStateFor(args);
 			const text = new Text("", 0, 0);
 			if (hideCollapsedToolCall(state, options.expanded === true, (value) => text.setText(value)))
 				return text;
@@ -563,9 +598,13 @@ export default function (pi: ExtensionAPI): void {
 			result: ToolResultLike,
 			options: RenderOptionsLike,
 			theme: ThemeLike,
+			args: unknown,
 		) => {
 			resolveBaseBackground(theme);
-			const state = collapseStateFor(options.toolCallId);
+			// The host forwards the card's stable per-call `args` object as the
+			// fourth argument (`tool-execution.ts:1424-1429`), which is the only
+			// identity that survives repaints. See `collapseStateFor`.
+			const state = collapseStateFor(args);
 			const text = unframeToolResult(new Text("", 0, 0));
 			const details = result.details as SudoResultDetails | undefined;
 			const isPartial = options.isPartial === true;

@@ -1,9 +1,9 @@
 {
 	"name": "omp-pix-sudo",
-	"version": "0.3.31-omp.1",
+	"version": "0.3.31-omp.2",
 	"private": true,
 	"type": "module",
-	"description": "pix-sudo (`sudo_run` tool) ported from @xynogen/pix-sudo@0.3.31 to omp 18.4.10, with pix-runtime and pix-pretty vendored in-tree.",
+	"description": "pix-sudo (`sudo_run` tool) ported from @xynogen/pix-sudo@0.3.31 to omp 18.4.11, with pix-runtime and pix-pretty vendored in-tree.",
 	"license": "MIT",
 	"author": "steimerbyte (omp port); original work Copyright (c) 2026 xynogen",
 	"repository": {
